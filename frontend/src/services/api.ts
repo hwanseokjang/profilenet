@@ -23,6 +23,7 @@ import type {
   SubjectNodeDetail,
   RelationNodeDetail,
   ExpressionNodeDetail,
+  SentimentType,
 } from '../types/results';
 import {
   DOMAIN_CODES,
@@ -1255,12 +1256,54 @@ function mockGetNodeDetail(request: NodeDetailRequest): Promise<NodeDetailRespon
           groupName: '맛 표현',
           textType: '단답형',
           availableSentiments: ['긍정', '부정', '중립', '종합'],
+          subjectKeywords: [
+            { id: 'kw-1', name: 'OB맥주', query: 'OB&&(맥주||캔||비어||beer)' },
+            { id: 'kw-2', name: '카스', query: '카스&&(맥주||캔||비어||beer)' },
+            { id: 'kw-3', name: '테라', query: '테라&&(맥주||캔||비어||beer)' },
+          ],
+          relationKeywords: [
+            { id: 'rel-kw-1', name: '퇴근 후', query: '퇴근&&(후||하고)' },
+            { id: 'rel-kw-2', name: '회식', query: '회식' },
+            { id: 'rel-kw-3', name: '혼술', query: '혼자&&마시' },
+          ],
           buzzData: [
-            { expression: '상쾌하다', 긍정: 234, 부정: 12, 중립: 45, 종합: 291 },
-            { expression: '시원하다', 긍정: 456, 부정: 23, 중립: 78, 종합: 557 },
-            { expression: '쓰다', 긍정: 89, 부정: 145, 중립: 234, 종합: 468 },
-            { expression: '깔끔하다', 긍정: 312, 부정: 18, 중립: 56, 종합: 386 },
-            { expression: '부드럽다', 긍정: 267, 부정: 34, 중립: 89, 종합: 390 },
+            // OB맥주 + 퇴근 후
+            { expression: '시원하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 456, 부정: 23, 중립: 78, 종합: 557 },
+            { expression: '상쾌하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 312, 부정: 12, 중립: 56, 종합: 380 },
+            { expression: '깔끔하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 267, 부정: 18, 중립: 45, 종합: 330 },
+            { expression: '부드럽다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 189, 부정: 34, 중립: 67, 종합: 290 },
+            // OB맥주 + 회식
+            { expression: '시원하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 389, 부정: 45, 중립: 88, 종합: 522 },
+            { expression: '청량하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 267, 부정: 34, 중립: 65, 종합: 366 },
+            { expression: '깔끔하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 245, 부정: 28, 중립: 52, 종합: 325 },
+            { expression: '씁쓸하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 89, 부정: 145, 중립: 67, 종합: 301 },
+            // OB맥주 + 혼술
+            { expression: '부드럽다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 178, 부정: 23, 중립: 56, 종합: 257 },
+            { expression: '쓰다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 89, 부정: 189, 중립: 134, 종합: 412 },
+            { expression: '그럭저럭이다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 56, 부정: 34, 중립: 145, 종합: 235 },
+            { expression: '편하다', subjectKeywordId: 'kw-1', subjectKeywordName: 'OB맥주', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 134, 부정: 12, 중립: 67, 종합: 213 },
+            // 카스 + 퇴근 후
+            { expression: '청량하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 534, 부정: 34, 중립: 89, 종합: 657 },
+            { expression: '깔끔하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 456, 부정: 23, 중립: 67, 종합: 546 },
+            { expression: '시원하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 378, 부정: 19, 중립: 56, 종합: 453 },
+            { expression: '상쾌하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 289, 부정: 15, 중립: 45, 종합: 349 },
+            // 카스 + 회식
+            { expression: '깔끔하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 434, 부정: 45, 중립: 98, 종합: 577 },
+            { expression: '청량하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 345, 부정: 56, 중립: 78, 종합: 479 },
+            { expression: '시원하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 267, 부정: 34, 중립: 65, 종합: 366 },
+            { expression: '상쾌하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 189, 부정: 23, 중립: 45, 종합: 257 },
+            // 카스 + 혼술
+            { expression: '시원하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 289, 부정: 23, 중립: 67, 종합: 379 },
+            { expression: '부드럽다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 234, 부정: 34, 중립: 89, 종합: 357 },
+            { expression: '씁쓸하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 89, 부정: 134, 중립: 78, 종합: 301 },
+            { expression: '편하다', subjectKeywordId: 'kw-2', subjectKeywordName: '카스', relationKeywordId: 'rel-kw-3', relationKeywordName: '혼술', 긍정: 167, 부정: 12, 중립: 56, 종합: 235 },
+            // 테라 + 퇴근 후
+            { expression: '시원하다', subjectKeywordId: 'kw-3', subjectKeywordName: '테라', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 312, 부정: 18, 중립: 56, 종합: 386 },
+            { expression: '청량하다', subjectKeywordId: 'kw-3', subjectKeywordName: '테라', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 245, 부정: 23, 중립: 45, 종합: 313 },
+            { expression: '깔끔하다', subjectKeywordId: 'kw-3', subjectKeywordName: '테라', relationKeywordId: 'rel-kw-1', relationKeywordName: '퇴근 후', 긍정: 189, 부정: 15, 중립: 34, 종합: 238 },
+            // 테라 + 회식
+            { expression: '청량하다', subjectKeywordId: 'kw-3', subjectKeywordName: '테라', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 267, 부정: 34, 중립: 65, 종합: 366 },
+            { expression: '깔끔하다', subjectKeywordId: 'kw-3', subjectKeywordName: '테라', relationKeywordId: 'rel-kw-2', relationKeywordName: '회식', 긍정: 212, 부정: 28, 중립: 52, 종합: 292 },
           ],
           clusterData: [
             {
@@ -1268,24 +1311,65 @@ function mockGetNodeDetail(request: NodeDetailRequest): Promise<NodeDetailRespon
               clusterName: '긍정적 청량감',
               expressionCount: 234,
               documentCount: 456,
-              topExpressions: ['시원하다', '상쾌하다', '깔끔하다'],
+              topExpressions: ['시원하다', '상쾌하다', '깔끔하다', '청량하다'],
             },
             {
               clusterId: 'cluster-2',
               clusterName: '부드러운 맛',
               expressionCount: 189,
               documentCount: 312,
-              topExpressions: ['부드럽다', '목넘김이 좋다', '편하다'],
+              topExpressions: ['부드럽다', '편하다', '그럭저럭이다'],
             },
             {
               clusterId: 'cluster-3',
               clusterName: '쓴맛 관련',
               expressionCount: 156,
               documentCount: 278,
-              topExpressions: ['쓰다', '씁쓸하다', '진하다'],
+              topExpressions: ['쓰다', '씁쓸하다'],
             },
           ],
-          documents: generateMockDocuments('expression', 50),
+          documents: createExpressionDocuments([
+            // --- OB맥주 + 퇴근 후 ---
+            { date: '2025-01-30', title: '퇴근 후 마신 OB맥주', content: '오늘 야근 끝나고 편의점에서 OB맥주 한 캔 땄다. 정말 시원해서 피로가 싹 날아가는 느낌이었다. 다만 뒷맛이 약간 씁쓸하게 남는 건 어쩔 수 없다.', domain: '블로그', subject: 'OB맥주', relation: '퇴근 후', expressions: { '긍정': '시원하다', '부정': '씁쓸하다', '중립': '탄산이 강하다' } },
+            { date: '2025-01-26', title: 'OB맥주 퇴근 후기', content: '퇴근길 편의점 OB맥주. 오늘따라 유독 부드럽게 넘어가서 놀랐다. 피곤할 때 더 맛있는 건지. 쓴맛은 여전히 있지만 전체적으로 깔끔하다.', domain: '인스타그램', subject: 'OB맥주', relation: '퇴근 후', expressions: { '긍정': '부드럽다', '부정': '쓴맛이 있다', '중립': '깔끔하다' } },
+            { date: '2025-01-23', title: 'OB맥주 퇴근길 한캔', content: '오늘도 퇴근 후 OB. 탄산이 강해서 시원한 건 좋은데 뭔가 깔끔한 느낌도 든다. 탄산이 좀 세긴 하다.', domain: '블로그', subject: 'OB맥주', relation: '퇴근 후', expressions: { '긍정': '시원하고 깔끔하다', '중립': '탄산이 세다' } },
+            { date: '2025-01-17', title: 'OB맥주 퇴근 후 한캔', content: '요즘 퇴근 루틴이 생겼다. OB맥주 한 캔. 깔끔하게 마무리되는 하루. 상쾌한 느낌이다.', domain: '뉴스', subject: 'OB맥주', relation: '퇴근 후', expressions: { '긍정': '상쾌하다', '중립': '깔끔하다' } },
+            // --- OB맥주 + 회식 ---
+            { date: '2025-01-27', title: 'OB맥주 회식 솔직 후기', content: '팀 회식에서 OB맥주 먹었는데 솔직히 좀 씁쓸한 뒷맛이 있었다. 안주 영향인지 모르겠지만. 청량감은 있다.', domain: '블로그', subject: 'OB맥주', relation: '회식', expressions: { '긍정': '청량하다', '부정': '씁쓸하다', '중립': '평범하다' } },
+            { date: '2025-01-21', title: 'OB맥주 회식 경험', content: '이번 회식에서 OB맥주 주로 마셨다. 청량하고 가볍게 마실 수 있어서 분위기 살기 좋았다.', domain: '인스타그램', subject: 'OB맥주', relation: '회식', expressions: { '긍정': '청량하고 가볍다', '중립': '무난하다' } },
+            { date: '2025-01-20', title: 'OB맥주 회식 마무리', content: '오늘 회식 OB맥주로 마무리. 깔끔하게 떨어지는 맛이라 마지막 한 잔도 무리 없이 마셨다. 쓴 건 사실이다.', domain: '뉴스', subject: 'OB맥주', relation: '회식', expressions: { '긍정': '깔끔하다', '부정': '쓰다', '중립': '마시기 편하다' } },
+            // --- OB맥주 + 혼술 ---
+            { date: '2025-01-29', title: 'OB맥주 혼술 후기', content: '혼자 마시는 OB맥주. 솔직히 좀 쓰다. 원래 이런 맛이었나? 편하게 마시기엔 좋다.', domain: '블로그', subject: 'OB맥주', relation: '혼술', expressions: { '부정': '쓰다', '중립': '편하다' } },
+            { date: '2025-01-24', title: 'OB맥주 혼술 총평', content: '집에서 혼자 마시는 OB맥주. 편하게 마실 수 있어서 좋다. 부드럽고 시원하다. 쓴맛은 조금 있다.', domain: '인스타그램', subject: 'OB맥주', relation: '혼술', expressions: { '긍정': '시원하고 부드럽다', '부정': '쓴맛이 있다', '중립': '편하다' } },
+            { date: '2025-01-18', title: 'OB맥주 혼자 마셔보기', content: '오늘 혼술 OB맥주. 그럭저럭인 것 같다. 특별히 맛있지도 나쁘지도 않은 무난한 맥주.', domain: '뉴스', subject: 'OB맥주', relation: '혼술', expressions: { '중립': '그럭저럭이다' } },
+            // --- 카스 + 퇴근 후 ---
+            { date: '2025-01-30', title: '카스로 즐긴 퇴근길', content: '퇴근 후 카스 한 잔. 역시 청량감이 최고다. 이맛에 마시는 거지. 다만 너무 차갑게 마셔서 속이 좀 쓰렸다.', domain: '인스타그램', subject: '카스', relation: '퇴근 후', expressions: { '긍정': '청량하다', '부정': '속이 쓰리다', '중립': '시원하다' } },
+            { date: '2025-01-28', title: '카스와 함께하는 퇴근', content: '오늘 퇴근 후 카스. 탄산이 풍부하고 청량한 맛이 기분 전환에 딱이다. 깔끔하게 떨어진다.', domain: '블로그', subject: '카스', relation: '퇴근 후', expressions: { '긍정': '청량하고 깔끔하다', '중립': '탄산이 풍부하다' } },
+            { date: '2025-01-24', title: '카스 퇴근 후 마시기', content: '퇴근하고 마시는 카스. 깔끔하게 떨어지는 맛이 하루를 마무리하기 좋다. 상쾌하다.', domain: '뉴스', subject: '카스', relation: '퇴근 후', expressions: { '긍정': '깔끔하고 상쾌하다', '중립': '가볍다' } },
+            { date: '2025-01-21', title: '카스 퇴근 후 솔직 평', content: '오늘 퇴근 후 카스를 마셨는데 왜인지 쓴맛이 강하게 느껴졌다. 컨디션 탓인지. 청량감은 있다.', domain: '블로그', subject: '카스', relation: '퇴근 후', expressions: { '긍정': '청량하다', '부정': '쓰다', '중립': '평범하다' } },
+            { date: '2025-01-18', title: '카스 퇴근 후 기분', content: '퇴근 후 카스 한 캔. 상쾌하고 기분 좋게 하루를 마무리할 수 있었다.', domain: '인스타그램', subject: '카스', relation: '퇴근 후', expressions: { '긍정': '상쾌하다', '중립': '시원하다' } },
+            // --- 카스 + 회식 ---
+            { date: '2025-01-30', title: '카스로 즐긴 팀 회식', content: '팀 회식에서 카스를 마셨는데 깔끔한 맛이 인상적이었다. 치킨이랑 같이 먹으니 더 좋았다.', domain: '뉴스', subject: '카스', relation: '회식', expressions: { '긍정': '깔끔하다', '중립': '시원하다' } },
+            { date: '2025-01-25', title: '카스 회식 만족 후기', content: '회식 자리 카스 한 잔. 시원하게 분위기 살아났다. 다들 만족스러워했다. 쓴맛이 살짝 남는다.', domain: '블로그', subject: '카스', relation: '회식', expressions: { '긍정': '시원하다', '부정': '쓴맛이 남는다', '중립': '적당하다' } },
+            { date: '2025-01-23', title: '카스 회식 총정리', content: '이번 회식 카스. 청량한 맛이 분위기를 업시켜줬다. 괜찮은 선택이었다.', domain: '인스타그램', subject: '카스', relation: '회식', expressions: { '긍정': '청량하다', '중립': '괜찮다' } },
+            // --- 카스 + 혼술 ---
+            { date: '2025-01-27', title: '카스 혼술 느낌 정리', content: '혼자 마시는 카스. 특유의 청량함 덕분에 혼술도 기분 좋게 즐길 수 있었다. 부드럽게 넘어간다.', domain: '뉴스', subject: '카스', relation: '혼술', expressions: { '긍정': '청량하고 시원하다', '중립': '부드럽다' } },
+            { date: '2025-01-22', title: '카스 혼술 맛 평가', content: '카스 혼술. 부드럽게 넘어가서 혼자 마시기 편한 맥주다. 강하지 않아서 좋다. 씁쓸한 뒷맛은 있다.', domain: '블로그', subject: '카스', relation: '혼술', expressions: { '긍정': '부드럽다', '부정': '씁쓸한 뒷맛', '중립': '무난하다' } },
+            { date: '2025-01-16', title: '카스 혼술 솔직 평가', content: '오늘 혼술 카스인데 왠지 씁쓸한 느낌이 남는다. 뭔가 아쉬운 하루여서 그런가. 청량감만큼은 좋다.', domain: '인스타그램', subject: '카스', relation: '혼술', expressions: { '긍정': '청량하다', '부정': '씁쓸하다', '중립': '평범하다' } },
+            // --- 테라 + 퇴근 후 ---
+            { date: '2025-01-29', title: '테라 한 캔 퇴근길', content: '퇴근길에 편의점 들러 테라를 샀다. 청량감이 정말 좋다. 거품도 풍성하고. 깔끔하게 마셨다.', domain: '블로그', subject: '테라', relation: '퇴근 후', expressions: { '긍정': '청량하다', '중립': '깔끔하다' } },
+            { date: '2025-01-26', title: '테라 퇴근 후 한잔', content: '퇴근 후 테라. 상쾌한 맛이 하루 동안 쌓인 스트레스를 씻어내는 것 같았다. 약간 쓴맛이 있지만 괜찮다.', domain: '인스타그램', subject: '테라', relation: '퇴근 후', expressions: { '긍정': '상쾌하다', '부정': '약간 쓰다', '중립': '적당하다' } },
+            { date: '2025-01-22', title: '테라 퇴근 후 감상', content: '테라 퇴근 후 한 캔. 시원하고 기분 전환에 딱이었다. 역시 테라는 퇴근 후지. 탄산이 적당하다.', domain: '뉴스', subject: '테라', relation: '퇴근 후', expressions: { '긍정': '시원하다', '중립': '탄산이 적당하다' } },
+            { date: '2025-01-19', title: '테라 퇴근 후 총평', content: '오늘 퇴근 후 테라. 부담 없이 즐기기 좋은 맥주다. 깔끔하고 시원하다. 편하게 마실 수 있다.', domain: '블로그', subject: '테라', relation: '퇴근 후', expressions: { '긍정': '깔끔하고 시원하다', '중립': '편하다' } },
+            { date: '2025-01-16', title: '테라 퇴근 후 기대감', content: '오늘 퇴근 후 테라 한 캔. 역시 시원하다. 탄산감이 적당하고 뒷맛도 깔끔하다.', domain: '인스타그램', subject: '테라', relation: '퇴근 후', expressions: { '긍정': '시원하고 깔끔하다', '중립': '탄산감이 적당하다' } },
+            // --- 테라 + 회식 ---
+            { date: '2025-01-28', title: '테라와 즐거운 회식', content: '회식에서 테라를 마셨다. 깔끔한 맛이 음식이랑 잘 어울렸다. 다들 만족해했다. 쓴맛도 조금 있다.', domain: '뉴스', subject: '테라', relation: '회식', expressions: { '긍정': '깔끔하다', '부정': '쓴맛이 있다', '중립': '평범하다' } },
+            { date: '2025-01-23', title: '테라 회식 분위기', content: '이번 회식 테라로. 청량하고 깔끔해서 분위기가 좋았다. 시원하게 마셨다.', domain: '블로그', subject: '테라', relation: '회식', expressions: { '긍정': '청량하고 깔끔하다', '중립': '시원하다' } },
+            { date: '2025-01-17', title: '테라 회식 소감', content: '회식 테라. 부드러운 맛이 술자리 분위기와 잘 맞았다. 부담 없이 마실 수 있었다.', domain: '인스타그램', subject: '테라', relation: '회식', expressions: { '긍정': '부드럽다', '중립': '부담 없다' } },
+            // --- 테라 + 혼술 ---
+            { date: '2025-01-25', title: '테라 혼술 느낌', content: '테라 혼술. 그럭저럭인 것 같다. 특별하지는 않지만 그렇다고 나쁘지도 않다. 시원함은 있다.', domain: '뉴스', subject: '테라', relation: '혼술', expressions: { '긍정': '시원하다', '중립': '그럭저럭이다' } },
+            { date: '2025-01-20', title: '테라 혼술 냉정 후기', content: '오늘 테라 혼술인데 왠지 씁쓸했다. 맥주 탓인지 기분 탓인지 모르겠다. 청량감은 있다.', domain: '블로그', subject: '테라', relation: '혼술', expressions: { '긍정': '청량하다', '부정': '씁쓸하다', '중립': '무난하다' } },
+          ], 'expression-1'),
         };
         resolve({ success: true, nodeType: 'expression', data: detail });
       }
@@ -1296,12 +1380,34 @@ function mockGetNodeDetail(request: NodeDetailRequest): Promise<NodeDetailRespon
           groupName: '향 표현',
           textType: '단답형',
           availableSentiments: ['긍정', '부정', '중립', '종합'],
+          subjectKeywords: [
+            { id: 'kw-4', name: '하이네켄', query: '하이네켄&&(맥주||beer)' },
+            { id: 'kw-5', name: '버드와이저', query: '버드와이저&&(맥주||beer)' },
+          ],
+          relationKeywords: [
+            { id: 'rel-kw-4', name: '치킨', query: '치킨' },
+            { id: 'rel-kw-5', name: '피자', query: '피자' },
+            { id: 'rel-kw-6', name: '삼겹살', query: '삼겹살' },
+          ],
           buzzData: [
-            { expression: '고소하다', 긍정: 456, 부정: 12, 중립: 67, 종합: 535 },
-            { expression: '향긋하다', 긍정: 334, 부정: 8, 중립: 45, 종합: 387 },
-            { expression: '톡 쏘다', 긍정: 123, 부정: 89, 중립: 156, 종합: 368 },
-            { expression: '구수하다', 긍정: 267, 부정: 23, 중립: 78, 종합: 368 },
-            { expression: '향이 강하다', 긍정: 189, 부정: 67, 중립: 112, 종합: 368 },
+            // 하이네켄 + 치킨
+            { expression: '고소하다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-4', relationKeywordName: '치킨', 긍정: 456, 부정: 12, 중립: 67, 종합: 535 },
+            { expression: '향긋하다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-4', relationKeywordName: '치킨', 긍정: 334, 부정: 8, 중립: 45, 종합: 387 },
+            { expression: '구수하다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-4', relationKeywordName: '치킨', 긍정: 267, 부정: 23, 중립: 78, 종합: 368 },
+            // 하이네켄 + 피자
+            { expression: '향긋하다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-5', relationKeywordName: '피자', 긍정: 312, 부정: 15, 중립: 56, 종합: 383 },
+            { expression: '톡 쏘다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-5', relationKeywordName: '피자', 긍정: 123, 부정: 89, 중립: 156, 종합: 368 },
+            { expression: '고소하다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-5', relationKeywordName: '피자', 긍정: 245, 부정: 18, 중립: 45, 종합: 308 },
+            // 하이네켄 + 삼겹살
+            { expression: '구수하다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-6', relationKeywordName: '삼겹살', 긍정: 289, 부정: 34, 중립: 78, 종합: 401 },
+            { expression: '향이 강하다', subjectKeywordId: 'kw-4', subjectKeywordName: '하이네켄', relationKeywordId: 'rel-kw-6', relationKeywordName: '삼겹살', 긍정: 189, 부정: 67, 중립: 112, 종합: 368 },
+            // 버드와이저 + 치킨
+            { expression: '고소하다', subjectKeywordId: 'kw-5', subjectKeywordName: '버드와이저', relationKeywordId: 'rel-kw-4', relationKeywordName: '치킨', 긍정: 389, 부정: 23, 중립: 67, 종합: 479 },
+            { expression: '구수하다', subjectKeywordId: 'kw-5', subjectKeywordName: '버드와이저', relationKeywordId: 'rel-kw-4', relationKeywordName: '치킨', 긍정: 312, 부정: 34, 중립: 89, 종합: 435 },
+            { expression: '톡 쏘다', subjectKeywordId: 'kw-5', subjectKeywordName: '버드와이저', relationKeywordId: 'rel-kw-4', relationKeywordName: '치킨', 긍정: 145, 부정: 78, 중립: 134, 종합: 357 },
+            // 버드와이저 + 피자
+            { expression: '향긋하다', subjectKeywordId: 'kw-5', subjectKeywordName: '버드와이저', relationKeywordId: 'rel-kw-5', relationKeywordName: '피자', 긍정: 267, 부정: 23, 중립: 65, 종합: 355 },
+            { expression: '고소하다', subjectKeywordId: 'kw-5', subjectKeywordName: '버드와이저', relationKeywordId: 'rel-kw-5', relationKeywordName: '피자', 긍정: 212, 부정: 18, 중립: 45, 종합: 275 },
           ],
           clusterData: [
             {
@@ -1316,17 +1422,43 @@ function mockGetNodeDetail(request: NodeDetailRequest): Promise<NodeDetailRespon
               clusterName: '강한 향',
               expressionCount: 234,
               documentCount: 423,
-              topExpressions: ['톡 쏘다', '향이 강하다', '진하다'],
+              topExpressions: ['톡 쏘다', '향이 강하다'],
             },
             {
               clusterId: 'cluster-6',
               clusterName: '부드러운 향',
               expressionCount: 178,
               documentCount: 334,
-              topExpressions: ['은은하다', '부드럽다', '편안하다'],
+              topExpressions: ['은은하다', '편안하다'],
             },
           ],
-          documents: generateMockDocuments('expression-scent', 50),
+          documents: createExpressionDocuments([
+            // --- 하이네켄 + 치킨 ---
+            { date: '2025-01-30', title: '하이네켄과 치킨 조합', content: '치킨 시켜서 하이네켄이랑 먹었는데 고소한 향이 치킨이랑 정말 잘 어울렸다. 향이 좀 강한 편이긴 하다.', domain: '블로그', subject: '하이네켄', relation: '치킨', expressions: { '긍정': '고소하다', '부정': '향이 강하다', '중립': '어울린다' } },
+            { date: '2025-01-27', title: '하이네켄 치킨 꿀조합', content: '하이네켄 특유의 향긋함이 치킨의 기름진 맛을 잡아줘서 조화가 좋았다. 구수하기도 하다.', domain: '인스타그램', subject: '하이네켄', relation: '치킨', expressions: { '긍정': '향긋하고 구수하다', '중립': '조화롭다' } },
+            { date: '2025-01-24', title: '하이네켄 치킨 페어링', content: '치킨에 하이네켄 조합. 고소하고 향긋한 향이 어우러져 시너지가 났다. 처음엔 향이 강해서 낯설었다.', domain: '뉴스', subject: '하이네켄', relation: '치킨', expressions: { '긍정': '고소하고 향긋하다', '부정': '향이 낯설다', '중립': '시너지가 있다' } },
+            { date: '2025-01-21', title: '하이네켄 치킨 첫 시도', content: '처음으로 하이네켄을 치킨이랑 먹어봤다. 구수한 향이 조화롭게 어우러져서 좋았다.', domain: '블로그', subject: '하이네켄', relation: '치킨', expressions: { '긍정': '구수하다', '중립': '조화롭다' } },
+            // --- 하이네켄 + 피자 ---
+            { date: '2025-01-29', title: '하이네켄 피자 마리아쥬', content: '피자와 하이네켄. 향긋한 맥주 향이 피자의 치즈 향과 잘 어울렸다. 좋은 조합이다.', domain: '인스타그램', subject: '하이네켄', relation: '피자', expressions: { '긍정': '향긋하다', '중립': '잘 어울린다' } },
+            { date: '2025-01-28', title: '하이네켄 피자 솔직 후기', content: '피자랑 하이네켄 먹었는데 탄산이 톡 쏘는 게 피자 먹고 나서 좀 강하게 느껴졌다. 고소한 향은 좋다.', domain: '블로그', subject: '하이네켄', relation: '피자', expressions: { '긍정': '고소하다', '부정': '탄산이 너무 강하다', '중립': '톡 쏜다' } },
+            { date: '2025-01-25', title: '하이네켄 피자 경험', content: '피자 파티에서 하이네켄을 마셨다. 고소한 향이 피자와 잘 맞아서 만족스러웠다.', domain: '뉴스', subject: '하이네켄', relation: '피자', expressions: { '긍정': '고소하다', '중립': '잘 맞는다' } },
+            { date: '2025-01-23', title: '하이네켄 피자 첫인상', content: '하이네켄과 피자. 향긋한 맥주 풍미가 피자의 토핑 향과 묘하게 잘 어울렸다. 향이 좀 세긴 하다.', domain: '블로그', subject: '하이네켄', relation: '피자', expressions: { '긍정': '향긋하다', '부정': '향이 세다', '중립': '묘하게 어울린다' } },
+            // --- 하이네켄 + 삼겹살 ---
+            { date: '2025-01-28', title: '하이네켄 삼겹살 파티', content: '삼겹살 구우면서 하이네켄 마셨는데 구수한 향이 고기 향이랑 어울려서 좋았다. 좀 진하긴 하다.', domain: '인스타그램', subject: '하이네켄', relation: '삼겹살', expressions: { '긍정': '구수하다', '부정': '향이 진하다', '중립': '잘 어울린다' } },
+            { date: '2025-01-27', title: '하이네켄 삼겹살 솔직평', content: '삼겹살에 하이네켄. 향이 강하다고 느껴졌다. 삼겹살 자체 향과 겹쳐서 좀 부담스러웠다.', domain: '뉴스', subject: '하이네켄', relation: '삼겹살', expressions: { '부정': '향이 너무 강하다', '중립': '향이 강하다' } },
+            { date: '2025-01-24', title: '하이네켄 삼겹살 조합', content: '삼겹살에 하이네켄. 향이 너무 강해서 오히려 음식 맛을 방해하는 느낌이었다. 구수함은 좋다.', domain: '블로그', subject: '하이네켄', relation: '삼겹살', expressions: { '긍정': '구수하다', '부정': '향이 음식을 방해한다', '중립': '강렬하다' } },
+            { date: '2025-01-22', title: '하이네켄 삼겹살 경험', content: '삼겹살 파티에서 하이네켄을 마셨다. 구수한 향이 고기 기름기를 잘 잡아줬다.', domain: '인스타그램', subject: '하이네켄', relation: '삼겹살', expressions: { '긍정': '구수하다', '중립': '기름기를 잡아준다' } },
+            // --- 버드와이저 + 치킨 ---
+            { date: '2025-01-30', title: '버드와이저 치킨 조합', content: '치킨이랑 버드와이저. 고소한 향이 치킨과 잘 맞았다. 클래식한 조합. 향긋하기도 하다.', domain: '뉴스', subject: '버드와이저', relation: '치킨', expressions: { '긍정': '고소하고 향긋하다', '중립': '잘 맞는다' } },
+            { date: '2025-01-26', title: '버드와이저 치킨 향', content: '버드와이저의 구수한 향이 치킨을 먹으면서 은근히 잘 어울렸다. 클래식한 조합. 약간 텁텁하다.', domain: '블로그', subject: '버드와이저', relation: '치킨', expressions: { '긍정': '구수하다', '부정': '텁텁하다', '중립': '잘 어울린다' } },
+            { date: '2025-01-25', title: '버드와이저 치킨 인상', content: '치킨이랑 버드와이저 처음 먹어봤다. 향긋한 맥주 향이 치킨 냄새랑 어울렸다.', domain: '인스타그램', subject: '버드와이저', relation: '치킨', expressions: { '긍정': '향긋하다', '중립': '어울린다' } },
+            { date: '2025-01-23', title: '버드와이저 치킨 솔직', content: '치킨 시키고 버드와이저. 탄산감이 톡 쏘는데 오히려 치킨 먹을 때 개운하게 해줬다. 고소하다.', domain: '뉴스', subject: '버드와이저', relation: '치킨', expressions: { '긍정': '고소하고 개운하다', '중립': '톡 쏜다' } },
+            { date: '2025-01-21', title: '버드와이저 치킨 페어링', content: '버드와이저랑 치킨 먹었는데 고소한 느낌이 배가 됐다. 둘 다 고소한 맛이라 잘 맞는 듯. 향이 좀 강하다.', domain: '블로그', subject: '버드와이저', relation: '치킨', expressions: { '긍정': '고소하다', '부정': '향이 강하다', '중립': '잘 맞는다' } },
+            // --- 버드와이저 + 피자 ---
+            { date: '2025-01-29', title: '버드와이저 피자 후기', content: '피자랑 버드와이저. 향긋한 맥주 향이 피자 치즈 향과 어우러졌다. 고소하기도 하다.', domain: '인스타그램', subject: '버드와이저', relation: '피자', expressions: { '긍정': '향긋하고 고소하다', '중립': '어우러진다' } },
+            { date: '2025-01-22', title: '버드와이저 피자 시음', content: '피자랑 버드와이저 마셨는데 톡 쏘는 탄산감이 피자 먹을 때 좀 거슬렸다. 향은 괜찮았다.', domain: '뉴스', subject: '버드와이저', relation: '피자', expressions: { '긍정': '향이 괜찮다', '부정': '탄산이 거슬린다', '중립': '톡 쏜다' } },
+            { date: '2025-01-20', title: '버드와이저 피자 궁합', content: '피자에 버드와이저. 고소한 맥주 향이 피자와 잘 맞아서 만족스러운 경험이었다.', domain: '블로그', subject: '버드와이저', relation: '피자', expressions: { '긍정': '고소하다', '중립': '잘 맞는다' } },
+          ], 'expression-2'),
         };
         resolve({ success: true, nodeType: 'expression', data: detail });
       } else {
@@ -1339,6 +1471,35 @@ function mockGetNodeDetail(request: NodeDetailRequest): Promise<NodeDetailRespon
       }
     }, 500);
   });
+}
+
+/**
+ * Expression 노드용 문서 생성 헬퍼 (문서당 여러 감성 표현 가능)
+ */
+function createExpressionDocuments(
+  items: Array<{
+    date: string;
+    title: string;
+    content: string;
+    domain: string;
+    subject: string;
+    relation: string;
+    expressions: Partial<Record<SentimentType, string>>;
+  }>,
+  type: string
+) {
+  return items.map((item, i) => ({
+    id: `doc-${type}-${i}`,
+    title: item.title,
+    content: item.content,
+    url: `https://example.com/${type}/${i}`,
+    domain: item.domain,
+    publishedAt: new Date(item.date).toISOString(),
+    keywords: [item.subject, item.relation, '맥주'],
+    expressions: item.expressions,
+    subjectKeywordName: item.subject,
+    relationKeywordName: item.relation,
+  }));
 }
 
 /**

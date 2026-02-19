@@ -86,6 +86,10 @@ export interface OriginalDocument {
   domain: string;
   publishedAt: string;
   keywords: string[]; // 연관된 키워드들
+  // Expression 노드 전용 (선택) - 감성별 표현 (한 문서에 여러 감성 표현 가능)
+  expressions?: Partial<Record<SentimentType, string>>;
+  subjectKeywordName?: string;
+  relationKeywordName?: string;
 }
 
 /**
@@ -124,6 +128,10 @@ export type SentimentType = '긍정' | '부정' | '중립' | '종합';
  */
 export interface ExpressionBuzzData {
   expression: string;
+  subjectKeywordId?: string;
+  subjectKeywordName?: string;
+  relationKeywordId?: string;
+  relationKeywordName?: string;
   긍정: number;
   부정: number;
   중립: number;
@@ -149,6 +157,8 @@ export interface ExpressionNodeDetail {
   groupName: string;
   textType: '서술형' | '단답형';
   availableSentiments: SentimentType[];
+  subjectKeywords?: KeywordInfo[];
+  relationKeywords?: KeywordInfo[];
   buzzData: ExpressionBuzzData[];
   clusterData: ClusterData[];
   documents: OriginalDocument[];

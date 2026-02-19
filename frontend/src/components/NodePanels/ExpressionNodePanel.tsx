@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -19,6 +19,7 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Collapse,
 } from '@mui/material';
 import type { ExpressionNodeDetail, SentimentType } from '../../types/results';
 
@@ -28,40 +29,43 @@ interface ExpressionNodePanelProps {
 }
 
 export default function ExpressionNodePanel({ data, selectedKeywords }: ExpressionNodePanelProps) {
-  // 표현별 뷰: 감성 타입 복수 선택 (기본: 종합만 선택)
-  const [selectedSentiments, setSelectedSentiments] = useState<SentimentType[]>(['종합']);
-  // 클러스터 뷰: 감성 타입 단일 선택 (기본: 종합)
+  const top10SubjectKws = (data.subjectKeywords || []).slice(0, 10);
+  const top10RelationKws = (data.relationKeywords || []).slice(0, 10);
+  const hasKeywordContext = top10SubjectKws.length > 0 || top10RelationKws.length > 0;
+
+  const [selectedSentiments, setSelectedSentiments] = useState<SentimentType[]>(['긍정', '부정', '중립']);
   const [clusterSentiment, setClusterSentiment] = useState<SentimentType>('종합');
   const [showCluster, setShowCluster] = useState(false);
-  const [selectedExpressionRows, setSelectedExpressionRows] = useState<string[]>([]);
   const [selectedClusterRows, setSelectedClusterRows] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const documentsPerPage = 10;
+  const [expandedDocId, setExpandedDocId] = useState<string | null>(null);
+  const documentsPerPage = 15;
 
-  // 감성 타입 토글
+  const [pendingSubjectKwIds, setPendingSubjectKwIds] = useState<string[]>(
+    top10SubjectKws.map((kw) => kw.id)
+  );
+  const [pendingRelationKwIds, setPendingRelationKwIds] = useState<string[]>(
+    top10RelationKws.map((kw) => kw.id)
+  );
+  const [appliedSubjectKwIds, setAppliedSubjectKwIds] = useState<string[]>(
+    top10SubjectKws.map((kw) => kw.id)
+  );
+  const [appliedRelationKwIds, setAppliedRelationKwIds] = useState<string[]>(
+    top10RelationKws.map((kw) => kw.id)
+  );
+
   const handleSentimentToggle = (sentiment: SentimentType) => {
     setSelectedSentiments((prev) =>
       prev.includes(sentiment) ? prev.filter((s) => s !== sentiment) : [...prev, sentiment]
     );
   };
 
-  // 클러스터 토글
   const handleClusterToggle = () => {
     setShowCluster(!showCluster);
-    setSelectedExpressionRows([]);
     setSelectedClusterRows([]);
     setCurrentPage(1);
   };
 
-  // 표현 행 클릭 - 토글 방식
-  const handleExpressionRowClick = (expression: string) => {
-    setSelectedExpressionRows((prev) =>
-      prev.includes(expression) ? prev.filter((e) => e !== expression) : [...prev, expression]
-    );
-    setCurrentPage(1);
-  };
-
-  // 클러스터 행 클릭 - 토글 방식
   const handleClusterRowClick = (clusterId: string) => {
     setSelectedClusterRows((prev) =>
       prev.includes(clusterId) ? prev.filter((c) => c !== clusterId) : [...prev, clusterId]
@@ -69,49 +73,132 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
     setCurrentPage(1);
   };
 
-  // 필터링된 문서
-  let filteredDocuments = showCluster
-    ? selectedClusterRows.length > 0
-      ? data.documents.filter((doc) => {
-          return selectedClusterRows.some((clusterId) => {
-            const cluster = data.clusterData.find((c) => c.clusterId === clusterId);
-            return cluster?.topExpressions.some((expr) => doc.content.includes(expr));
-          });
-        })
-      : data.documents
-    : selectedExpressionRows.length > 0
-    ? data.documents.filter((doc) => selectedExpressionRows.some((expr) => doc.content.includes(expr)))
-    : data.documents;
+  const handleRowClick = (docId: string) => {
+    setExpandedDocId((prev) => (prev === docId ? null : docId));
+  };
 
-  // 전역 주제어 필터 적용
+  // ─────────────────────────────
+  // 표현별 뷰: 문서 필터링
+  // ─────────────────────────────
+  const expressionDocs = data.documents.filter(
+    (doc) => doc.expressions != null && Object.keys(doc.expressions).length > 0
+  );
+
+  let filteredExprDocs = expressionDocs;
+
+  if (top10SubjectKws.length > 0 && appliedSubjectKwIds.length > 0) {
+    const appliedSubjectNames = top10SubjectKws
+      .filter((kw) => appliedSubjectKwIds.includes(kw.id))
+      .map((kw) => kw.name);
+    filteredExprDocs = filteredExprDocs.filter(
+      (doc) => !doc.subjectKeywordName || appliedSubjectNames.includes(doc.subjectKeywordName)
+    );
+  }
+
+  if (top10RelationKws.length > 0 && appliedRelationKwIds.length > 0) {
+    const appliedRelationNames = top10RelationKws
+      .filter((kw) => appliedRelationKwIds.includes(kw.id))
+      .map((kw) => kw.name);
+    filteredExprDocs = filteredExprDocs.filter(
+      (doc) => !doc.relationKeywordName || appliedRelationNames.includes(doc.relationKeywordName)
+    );
+  }
+
+  // 감성 필터: 선택된 감성 중 하나라도 표현이 있는 문서만
+  filteredExprDocs = filteredExprDocs.filter(
+    (doc) => selectedSentiments.some((s) => !!doc.expressions?.[s])
+  );
+
   if (selectedKeywords && selectedKeywords.length > 0) {
-    filteredDocuments = filteredDocuments.filter((doc) =>
+    filteredExprDocs = filteredExprDocs.filter((doc) =>
       doc.keywords.some((kw) => selectedKeywords.includes(kw))
     );
   }
 
-  // 페이지네이션
-  const totalPages = Math.ceil(filteredDocuments.length / documentsPerPage);
-  const paginatedDocuments = filteredDocuments.slice(
+  const sortedExprDocs = [...filteredExprDocs].sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+  );
+
+  const exprTotalPages = Math.ceil(sortedExprDocs.length / documentsPerPage);
+  const paginatedExprDocs = sortedExprDocs.slice(
     (currentPage - 1) * documentsPerPage,
     currentPage * documentsPerPage
   );
 
-  // 감성별 색상
+  // ─────────────────────────────
+  // 클러스터 뷰: 원문 목록
+  // ─────────────────────────────
+  let clusterDocuments =
+    selectedClusterRows.length > 0
+      ? data.documents.filter((doc) =>
+          selectedClusterRows.some((clusterId) => {
+            const cluster = data.clusterData.find((c) => c.clusterId === clusterId);
+            return cluster?.topExpressions.some((expr) => doc.content.includes(expr));
+          })
+        )
+      : data.documents;
+
+  if (selectedKeywords && selectedKeywords.length > 0) {
+    clusterDocuments = clusterDocuments.filter((doc) =>
+      doc.keywords.some((kw) => selectedKeywords.includes(kw))
+    );
+  }
+
+  const clusterTotalPages = Math.ceil(clusterDocuments.length / documentsPerPage);
+  const paginatedClusterDocs = clusterDocuments.slice(
+    (currentPage - 1) * documentsPerPage,
+    currentPage * documentsPerPage
+  );
+
+  // ─────────────────────────────
+  // 유틸
+  // ─────────────────────────────
   const getSentimentColor = (sentiment: SentimentType) => {
     switch (sentiment) {
-      case '긍정':
-        return '#10b981';
-      case '부정':
-        return '#ef4444';
-      case '중립':
-        return '#6b7280';
-      case '종합':
-        return '#14b8a6';
-      default:
-        return '#9ca3af';
+      case '긍정': return '#10b981';
+      case '부정': return '#ef4444';
+      case '중립': return '#6b7280';
+      case '종합': return '#14b8a6';
+      default: return '#9ca3af';
     }
   };
+
+  const truncateTitle = (title: string, len = 10) =>
+    title.length > len ? title.slice(0, len) + '…' : title;
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
+  const outlinedBtnStyle = {
+    borderColor: '#4b5563',
+    color: '#9ca3af',
+    fontSize: '11px',
+    py: 0.5,
+    minWidth: 0,
+    '&:hover': { borderColor: '#14b8a6', color: '#14b8a6' },
+  };
+
+  const headerCellSx = (color = '#9ca3af') => ({
+    bgcolor: '#1f2937',
+    color,
+    borderBottom: '1px solid #374151',
+    fontWeight: 600,
+    fontSize: '12px',
+    py: 1,
+    px: 1.5,
+  });
+
+  const bodyCellSx = (color = '#f9fafb') => ({
+    color,
+    borderBottom: '1px solid #2d3748',
+    fontSize: '12px',
+    py: 0.75,
+    px: 1.5,
+  });
+
+  const totalColCount = 2 + (hasKeywordContext ? 2 : 0) + selectedSentiments.length;
 
   return (
     <Box>
@@ -119,14 +206,76 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
         {data.groupName} - 상세 정보 ({data.textType})
       </Typography>
 
-      {/* 감성 타입 복수 선택 & 클러스터 토글 */}
+      {/* 주제어/연관어 선택 패널 */}
+      {hasKeywordContext && (
+        <Paper sx={{ p: 3, mb: 3, bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
+          <Grid container spacing={3}>
+            {top10SubjectKws.length > 0 && (
+              <Grid size={{ xs: top10RelationKws.length > 0 ? 6 : 12 }}>
+                <Typography variant="subtitle2" sx={{ color: '#f9fafb', mb: 1.5, fontWeight: 600 }}>
+                  주제어 선택{' '}
+                  <Typography component="span" variant="caption" sx={{ color: '#9ca3af' }}>
+                    (상위 {top10SubjectKws.length}개)
+                  </Typography>
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+                  <Button variant="outlined" size="small" onClick={() => setPendingSubjectKwIds(top10SubjectKws.map((kw) => kw.id))} sx={outlinedBtnStyle}>전체 선택</Button>
+                  <Button variant="outlined" size="small" onClick={() => setPendingSubjectKwIds([])} sx={outlinedBtnStyle}>전체 제거</Button>
+                </Box>
+                <Box sx={{ mb: 2 }}>
+                  {top10SubjectKws.map((kw) => (
+                    <Box key={kw.id} sx={{ display: 'inline-flex', alignItems: 'center', mr: 1.5, mb: 0.5 }}>
+                      <Checkbox
+                        checked={pendingSubjectKwIds.includes(kw.id)}
+                        onChange={() => setPendingSubjectKwIds((prev) => prev.includes(kw.id) ? prev.filter((i) => i !== kw.id) : [...prev, kw.id])}
+                        size="small"
+                        sx={{ color: '#3b82f6', '&.Mui-checked': { color: '#3b82f6' }, p: 0.5 }}
+                      />
+                      <Typography variant="body2" sx={{ color: '#f9fafb', fontSize: '13px' }}>{kw.name}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                <Button variant="contained" size="small" onClick={() => { setAppliedSubjectKwIds(pendingSubjectKwIds); setCurrentPage(1); }} sx={{ bgcolor: '#3b82f6', color: 'white', '&:hover': { bgcolor: '#2563eb' } }}>적용하기</Button>
+              </Grid>
+            )}
+
+            {top10RelationKws.length > 0 && (
+              <Grid size={{ xs: top10SubjectKws.length > 0 ? 6 : 12 }}>
+                <Typography variant="subtitle2" sx={{ color: '#f9fafb', mb: 1.5, fontWeight: 600 }}>
+                  연관어 선택{' '}
+                  <Typography component="span" variant="caption" sx={{ color: '#9ca3af' }}>
+                    (상위 {top10RelationKws.length}개)
+                  </Typography>
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+                  <Button variant="outlined" size="small" onClick={() => setPendingRelationKwIds(top10RelationKws.map((kw) => kw.id))} sx={outlinedBtnStyle}>전체 선택</Button>
+                  <Button variant="outlined" size="small" onClick={() => setPendingRelationKwIds([])} sx={outlinedBtnStyle}>전체 제거</Button>
+                </Box>
+                <Box sx={{ mb: 2 }}>
+                  {top10RelationKws.map((kw) => (
+                    <Box key={kw.id} sx={{ display: 'inline-flex', alignItems: 'center', mr: 1.5, mb: 0.5 }}>
+                      <Checkbox
+                        checked={pendingRelationKwIds.includes(kw.id)}
+                        onChange={() => setPendingRelationKwIds((prev) => prev.includes(kw.id) ? prev.filter((i) => i !== kw.id) : [...prev, kw.id])}
+                        size="small"
+                        sx={{ color: '#8b5cf6', '&.Mui-checked': { color: '#8b5cf6' }, p: 0.5 }}
+                      />
+                      <Typography variant="body2" sx={{ color: '#f9fafb', fontSize: '13px' }}>{kw.name}</Typography>
+                    </Box>
+                  ))}
+                </Box>
+                <Button variant="contained" size="small" onClick={() => { setAppliedRelationKwIds(pendingRelationKwIds); setCurrentPage(1); }} sx={{ bgcolor: '#8b5cf6', color: 'white', '&:hover': { bgcolor: '#7c3aed' } }}>적용하기</Button>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
+      )}
+
+      {/* 감성 타입 선택 & 클러스터 토글 */}
       <Paper sx={{ p: 3, mb: 3, bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          {/* 감성 타입 복수 선택 */}
           <Box>
-            <Typography variant="subtitle2" sx={{ color: '#9ca3af', mb: 1 }}>
-              감성 타입 선택
-            </Typography>
+            <Typography variant="subtitle2" sx={{ color: '#9ca3af', mb: 1 }}>감성 타입 선택</Typography>
             <Box sx={{ display: 'flex', gap: 2 }}>
               {data.availableSentiments.map((sentiment) => (
                 <FormControlLabel
@@ -135,12 +284,7 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
                     <Checkbox
                       checked={selectedSentiments.includes(sentiment)}
                       onChange={() => handleSentimentToggle(sentiment)}
-                      sx={{
-                        color: getSentimentColor(sentiment),
-                        '&.Mui-checked': {
-                          color: getSentimentColor(sentiment),
-                        },
-                      }}
+                      sx={{ color: getSentimentColor(sentiment), '&.Mui-checked': { color: getSentimentColor(sentiment) } }}
                     />
                   }
                   label={<Typography sx={{ color: '#f9fafb' }}>{sentiment}</Typography>}
@@ -149,12 +293,9 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
             </Box>
           </Box>
 
-          {/* 클러스터 토글 버튼 & 감성 타입 선택 */}
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
             <Box>
-              <Typography variant="subtitle2" sx={{ color: '#9ca3af', mb: 1 }}>
-                클러스터링 적용
-              </Typography>
+              <Typography variant="subtitle2" sx={{ color: '#9ca3af', mb: 1 }}>클러스터링 적용</Typography>
               <Button
                 variant={showCluster ? 'contained' : 'outlined'}
                 onClick={handleClusterToggle}
@@ -162,10 +303,7 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
                   bgcolor: showCluster ? '#14b8a6' : 'transparent',
                   borderColor: '#14b8a6',
                   color: showCluster ? 'white' : '#14b8a6',
-                  '&:hover': {
-                    bgcolor: showCluster ? '#0d9488' : 'rgba(20, 184, 166, 0.1)',
-                    borderColor: '#14b8a6',
-                  },
+                  '&:hover': { bgcolor: showCluster ? '#0d9488' : 'rgba(20, 184, 166, 0.1)', borderColor: '#14b8a6' },
                 }}
               >
                 {showCluster ? '클러스터 뷰' : '표현별 뷰'}
@@ -174,14 +312,7 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
 
             {showCluster && (
               <FormControl sx={{ minWidth: 120 }}>
-                <InputLabel
-                  sx={{
-                    color: '#9ca3af',
-                    '&.Mui-focused': { color: '#14b8a6' },
-                  }}
-                >
-                  감성 타입
-                </InputLabel>
+                <InputLabel sx={{ color: '#9ca3af', '&.Mui-focused': { color: '#14b8a6' } }}>감성 타입</InputLabel>
                 <Select
                   value={clusterSentiment}
                   onChange={(e) => setClusterSentiment(e.target.value as SentimentType)}
@@ -195,9 +326,7 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
                   }}
                 >
                   {data.availableSentiments.map((sentiment) => (
-                    <MenuItem key={sentiment} value={sentiment}>
-                      {sentiment}
-                    </MenuItem>
+                    <MenuItem key={sentiment} value={sentiment}>{sentiment}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -206,238 +335,274 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
         </Box>
       </Paper>
 
-      {/* 표별 뷰 */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* 클러스터 뷰가 아닐 때: 감성별 표현 테이블 표시 */}
-        {!showCluster && (() => {
-          // 각 감성별로 버즈량 상위 표현들 추출
-          const getSortedExpressionsBySentiment = (sentiment: SentimentType) => {
-            return [...data.buzzData]
-              .sort((a, b) => b[sentiment] - a[sentiment])
-              .map(item => item.expression);
-          };
+      {/* 표현별 뷰: 문서 1:1 매핑 테이블 */}
+      {!showCluster && (
+        <Paper sx={{ mb: 3, bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
+          <Box sx={{ px: 2, pt: 2, pb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="subtitle1" sx={{ color: '#f9fafb', fontWeight: 600 }}>
+              표현 목록
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#9ca3af' }}>
+              총 {sortedExprDocs.length}건 · 최신순 · 행 클릭 시 원문 확인
+            </Typography>
+          </Box>
 
-          const sentimentExpressions: Record<SentimentType, string[]> = {
-            긍정: getSortedExpressionsBySentiment('긍정'),
-            부정: getSortedExpressionsBySentiment('부정'),
-            중립: getSortedExpressionsBySentiment('중립'),
-            종합: getSortedExpressionsBySentiment('종합'),
-          };
+          <TableContainer sx={{ maxHeight: '600px' }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={headerCellSx()}>일자</TableCell>
+                  <TableCell sx={headerCellSx()}>원문 제목</TableCell>
+                  {hasKeywordContext && (
+                    <>
+                      <TableCell sx={headerCellSx('#3b82f6')}>주제어</TableCell>
+                      <TableCell sx={headerCellSx('#8b5cf6')}>연관어</TableCell>
+                    </>
+                  )}
+                  {selectedSentiments.map((sentiment) => (
+                    <TableCell key={sentiment} sx={headerCellSx(getSentimentColor(sentiment))}>
+                      {sentiment} 표현
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
 
-          // 최대 행 수 (가장 긴 리스트 기준)
-          const maxRows = Math.max(...selectedSentiments.map(s => sentimentExpressions[s].length));
-
-          return (
-            <Grid size={{ xs: 12 }}>
-              <Paper sx={{ bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
-                <Typography variant="subtitle1" sx={{ color: '#f9fafb', p: 2, fontWeight: 600 }}>
-                  감성별 표현 (행 클릭으로 선택)
-                </Typography>
-                <TableContainer sx={{ maxHeight: '400px' }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ bgcolor: '#1f2937', color: '#9ca3af', borderBottom: '1px solid #374151', fontWeight: 600 }}>
-                          순위
+              <TableBody>
+                {paginatedExprDocs.length > 0 ? (
+                  paginatedExprDocs.map((doc) => (
+                    <React.Fragment key={doc.id}>
+                      {/* 데이터 행 */}
+                      <TableRow
+                        onClick={() => handleRowClick(doc.id)}
+                        sx={{
+                          cursor: 'pointer',
+                          bgcolor: expandedDocId === doc.id ? 'rgba(20, 184, 166, 0.08)' : 'transparent',
+                          '&:hover': { bgcolor: 'rgba(55, 65, 81, 0.5)' },
+                        }}
+                      >
+                        <TableCell sx={{ ...bodyCellSx('#9ca3af'), whiteSpace: 'nowrap' }}>
+                          {formatDate(doc.publishedAt)}
                         </TableCell>
-                        {selectedSentiments.map((sentiment) => (
-                          <TableCell
-                            key={sentiment}
-                            sx={{ bgcolor: '#1f2937', color: '#9ca3af', borderBottom: '1px solid #374151', fontWeight: 600 }}
-                          >
-                            {sentiment} 표현
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {Array.from({ length: maxRows }).map((_, rowIndex) => (
-                        <TableRow key={rowIndex}>
-                          <TableCell sx={{ color: '#6b7280', borderBottom: '1px solid #374151', fontWeight: 500 }}>
-                            {rowIndex + 1}
-                          </TableCell>
-                          {selectedSentiments.map((sentiment) => {
-                            const expression = sentimentExpressions[sentiment][rowIndex];
-                            return (
-                              <TableCell
-                                key={sentiment}
-                                onClick={() => expression && handleExpressionRowClick(expression)}
-                                sx={{
-                                  color: expression ? getSentimentColor(sentiment) : '#4b5563',
-                                  borderBottom: '1px solid #374151',
-                                  cursor: expression ? 'pointer' : 'default',
-                                  bgcolor: expression && selectedExpressionRows.includes(expression)
-                                    ? 'rgba(20, 184, 166, 0.1)'
-                                    : 'transparent',
-                                  '&:hover': expression ? {
-                                    bgcolor: 'rgba(55, 65, 81, 0.5)',
-                                  } : {},
-                                }}
+
+                        <TableCell sx={bodyCellSx()}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Typography sx={{ color: '#e5e7eb', fontSize: '12px' }}>
+                              {truncateTitle(doc.title)}
+                            </Typography>
+                            {doc.url && (
+                              <Typography
+                                component="a"
+                                href={doc.url}
+                                target="_blank"
+                                onClick={(e) => e.stopPropagation()}
+                                sx={{ color: '#6b7280', fontSize: '10px', textDecoration: 'none', flexShrink: 0, '&:hover': { color: '#14b8a6' } }}
                               >
-                                {expression || '-'}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-            </Grid>
-          );
-        })()}
+                                →
+                              </Typography>
+                            )}
+                          </Box>
+                        </TableCell>
 
-        {/* 클러스터 뷰일 때: 왼쪽에 클러스터 테이블, 오른쪽에 표현 디테일 */}
-        {showCluster && (
-          <>
-            {/* 클러스터 테이블 (왼쪽) */}
-            <Grid size={{ xs: 6 }}>
-              <Paper sx={{ bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
-                <Typography variant="subtitle1" sx={{ color: '#f9fafb', p: 2, fontWeight: 600 }}>
-                  클러스터별 분석 (행 클릭으로 선택)
-                </Typography>
-                <TableContainer sx={{ maxHeight: '400px' }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
+                        {hasKeywordContext && (
+                          <>
+                            <TableCell sx={bodyCellSx('#3b82f6')}>{doc.subjectKeywordName || '-'}</TableCell>
+                            <TableCell sx={bodyCellSx('#8b5cf6')}>{doc.relationKeywordName || '-'}</TableCell>
+                          </>
+                        )}
+
+                        {selectedSentiments.map((sentiment) => {
+                          const expr = doc.expressions?.[sentiment];
+                          return (
+                            <TableCell
+                              key={sentiment}
+                              sx={{
+                                ...bodyCellSx(expr ? getSentimentColor(sentiment) : '#4b5563'),
+                                fontWeight: expr ? 600 : 400,
+                              }}
+                            >
+                              {expr || '-'}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+
+                      {/* 원문 확장 행 */}
                       <TableRow>
-                        <TableCell sx={{ bgcolor: '#1f2937', color: '#9ca3af', borderBottom: '1px solid #374151', fontWeight: 600 }}>
-                          클러스터명
-                        </TableCell>
                         <TableCell
-                          sx={{ bgcolor: '#1f2937', color: '#9ca3af', borderBottom: '1px solid #374151', fontWeight: 600 }}
-                          align="right"
+                          colSpan={totalColCount}
+                          sx={{ py: 0, px: 0, borderBottom: expandedDocId === doc.id ? '1px solid #374151' : 'none' }}
                         >
-                          표현 수
-                        </TableCell>
-                        <TableCell
-                          sx={{ bgcolor: '#1f2937', color: '#9ca3af', borderBottom: '1px solid #374151', fontWeight: 600 }}
-                          align="right"
-                        >
-                          문서 수
+                          <Collapse in={expandedDocId === doc.id} timeout="auto" unmountOnExit>
+                            <Box sx={{ p: 2, bgcolor: '#111827', borderLeft: '3px solid #14b8a6' }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                <Chip label={doc.domain} size="small" sx={{ bgcolor: '#14b8a6', color: 'white', fontSize: '11px' }} />
+                                <Typography variant="caption" sx={{ color: '#9ca3af' }}>
+                                  {new Date(doc.publishedAt).toLocaleDateString('ko-KR')}
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: '#6b7280', ml: 'auto' }}>
+                                  ▲ 닫기
+                                </Typography>
+                              </Box>
+                              <Typography variant="subtitle2" sx={{ color: '#f9fafb', mb: 1, fontWeight: 600 }}>
+                                {doc.title}
+                              </Typography>
+                              <Typography variant="body2" sx={{ color: '#d1d5db', lineHeight: 1.7 }}>
+                                {doc.content}
+                              </Typography>
+                              {doc.url && (
+                                <Typography
+                                  variant="caption"
+                                  component="a"
+                                  href={doc.url}
+                                  target="_blank"
+                                  sx={{ color: '#14b8a6', mt: 1, display: 'block', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                                >
+                                  원문 보기 →
+                                </Typography>
+                              )}
+                            </Box>
+                          </Collapse>
                         </TableCell>
                       </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {data.clusterData.map((cluster) => (
-                        <TableRow
-                          key={cluster.clusterId}
-                          onClick={() => handleClusterRowClick(cluster.clusterId)}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={totalColCount}
+                      sx={{ color: '#6b7280', textAlign: 'center', py: 5, borderBottom: 'none' }}
+                    >
+                      선택된 조건에 해당하는 표현이 없습니다.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {exprTotalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <Pagination
+                count={exprTotalPages}
+                page={currentPage}
+                onChange={(_, page) => setCurrentPage(page)}
+                sx={{
+                  '& .MuiPaginationItem-root': { color: '#f9fafb' },
+                  '& .Mui-selected': { bgcolor: '#14b8a6 !important', color: 'white' },
+                }}
+              />
+            </Box>
+          )}
+        </Paper>
+      )}
+
+      {/* 클러스터 뷰 */}
+      {showCluster && (
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 6 }}>
+            <Paper sx={{ bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
+              <Typography variant="subtitle1" sx={{ color: '#f9fafb', p: 2, fontWeight: 600 }}>
+                클러스터별 분석{' '}
+                <Typography component="span" variant="caption" sx={{ color: '#9ca3af' }}>(행 클릭으로 선택)</Typography>
+              </Typography>
+              <TableContainer sx={{ maxHeight: '400px' }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={headerCellSx()}>클러스터명</TableCell>
+                      <TableCell sx={{ ...headerCellSx(), textAlign: 'right' }}>표현 수</TableCell>
+                      <TableCell sx={{ ...headerCellSx(), textAlign: 'right' }}>문서 수</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {data.clusterData.map((cluster) => (
+                      <TableRow
+                        key={cluster.clusterId}
+                        onClick={() => handleClusterRowClick(cluster.clusterId)}
+                        sx={{
+                          cursor: 'pointer',
+                          bgcolor: selectedClusterRows.includes(cluster.clusterId) ? 'rgba(20, 184, 166, 0.2)' : 'transparent',
+                          '&:hover': { bgcolor: 'rgba(55, 65, 81, 0.5)' },
+                        }}
+                      >
+                        <TableCell sx={bodyCellSx()}>{cluster.clusterName}</TableCell>
+                        <TableCell sx={{ ...bodyCellSx(), textAlign: 'right' }}>{cluster.expressionCount.toLocaleString()}</TableCell>
+                        <TableCell sx={{ ...bodyCellSx(), textAlign: 'right' }}>{cluster.documentCount.toLocaleString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Grid>
+
+          <Grid size={{ xs: 6 }}>
+            <Paper sx={{ bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
+              <Typography variant="subtitle1" sx={{ color: '#f9fafb', p: 2, fontWeight: 600 }}>
+                클러스터 표현 상세{' '}
+                {selectedClusterRows.length > 0
+                  ? `(${selectedClusterRows.map((id) => data.clusterData.find((c) => c.clusterId === id)?.clusterName).filter(Boolean).join(', ')})`
+                  : '(클러스터를 선택하세요)'}
+              </Typography>
+              <TableContainer sx={{ maxHeight: '400px' }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={headerCellSx()}>순위</TableCell>
+                      {selectedSentiments.map((sentiment) => (
+                        <TableCell
+                          key={sentiment}
                           sx={{
-                            cursor: 'pointer',
-                            bgcolor: selectedClusterRows.includes(cluster.clusterId)
-                              ? 'rgba(20, 184, 166, 0.2)'
-                              : 'transparent',
-                            '&:hover': {
-                              bgcolor: 'rgba(55, 65, 81, 0.5)',
-                            },
+                            ...headerCellSx(getSentimentColor(sentiment)),
+                            bgcolor: sentiment === clusterSentiment ? 'rgba(20, 184, 166, 0.2)' : '#1f2937',
                           }}
                         >
-                          <TableCell sx={{ color: '#f9fafb', borderBottom: '1px solid #374151', fontWeight: 500 }}>
-                            {cluster.clusterName}
-                          </TableCell>
-                          <TableCell sx={{ color: '#f9fafb', borderBottom: '1px solid #374151' }} align="right">
-                            {cluster.expressionCount.toLocaleString()}
-                          </TableCell>
-                          <TableCell sx={{ color: '#f9fafb', borderBottom: '1px solid #374151' }} align="right">
-                            {cluster.documentCount.toLocaleString()}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-            </Grid>
-
-            {/* 표현 디테일 (오른쪽) - 선택된 클러스터의 표현들 표시 */}
-            <Grid size={{ xs: 6 }}>
-              <Paper sx={{ bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
-                <Typography variant="subtitle1" sx={{ color: '#f9fafb', p: 2, fontWeight: 600 }}>
-                  클러스터 표현 상세{' '}
-                  {selectedClusterRows.length > 0
-                    ? `(${selectedClusterRows
-                        .map((id) => data.clusterData.find((c) => c.clusterId === id)?.clusterName)
-                        .filter(Boolean)
-                        .join(', ')})`
-                    : '(클러스터를 선택하세요)'}
-                </Typography>
-                <TableContainer sx={{ maxHeight: '400px' }}>
-                  <Table size="small" stickyHeader>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={{ bgcolor: '#1f2937', color: '#9ca3af', borderBottom: '1px solid #374151', fontWeight: 600 }}>
-                          순위
+                          {sentiment} 표현
                         </TableCell>
-                        {selectedSentiments.map((sentiment) => (
-                          <TableCell
-                            key={sentiment}
-                            sx={{
-                              bgcolor: sentiment === clusterSentiment ? 'rgba(20, 184, 166, 0.2)' : '#1f2937',
-                              color: '#9ca3af',
-                              borderBottom: '1px solid #374151',
-                              fontWeight: 600
-                            }}
-                          >
-                            {sentiment} 표현
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {selectedClusterRows.length > 0 ? (() => {
-                        // 선택된 클러스터들의 표현 수집
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {selectedClusterRows.length > 0 ? (
+                      (() => {
                         const clusterExpressions = selectedClusterRows.flatMap((clusterId) => {
                           const cluster = data.clusterData.find((c) => c.clusterId === clusterId);
                           return cluster?.topExpressions || [];
                         });
 
-                        // 각 감성별로 정렬된 표현 리스트
-                        const getSortedExpressionsBySentiment = (sentiment: SentimentType) => {
-                          return clusterExpressions
-                            .map(expr => {
-                              const buzzItem = data.buzzData.find(b => b.expression === expr);
-                              return buzzItem ? { expr, value: buzzItem[sentiment] } : null;
+                        const sortBySentiment = (s: SentimentType) =>
+                          clusterExpressions
+                            .map((expr) => {
+                              const b = data.buzzData.find((bz) => bz.expression === expr);
+                              return b ? { expr, value: b[s] } : null;
                             })
-                            .filter((item): item is { expr: string; value: number } => item !== null)
+                            .filter((x): x is { expr: string; value: number } => x !== null)
                             .sort((a, b) => b.value - a.value)
-                            .map(item => item.expr);
+                            .map((x) => x.expr);
+
+                        const sentimentExprs: Record<SentimentType, string[]> = {
+                          긍정: sortBySentiment('긍정'),
+                          부정: sortBySentiment('부정'),
+                          중립: sortBySentiment('중립'),
+                          종합: sortBySentiment('종합'),
                         };
 
-                        const sentimentExpressions: Record<SentimentType, string[]> = {
-                          긍정: getSortedExpressionsBySentiment('긍정'),
-                          부정: getSortedExpressionsBySentiment('부정'),
-                          중립: getSortedExpressionsBySentiment('중립'),
-                          종합: getSortedExpressionsBySentiment('종합'),
-                        };
-
-                        const maxRows = Math.max(...selectedSentiments.map(s => sentimentExpressions[s].length));
+                        const maxRows = Math.max(
+                          ...selectedSentiments.map((s) => sentimentExprs[s].length),
+                          0
+                        );
 
                         return Array.from({ length: maxRows }).map((_, rowIndex) => (
                           <TableRow key={rowIndex}>
-                            <TableCell sx={{ color: '#6b7280', borderBottom: '1px solid #374151', fontWeight: 500 }}>
-                              {rowIndex + 1}
-                            </TableCell>
+                            <TableCell sx={bodyCellSx('#6b7280')}>{rowIndex + 1}</TableCell>
                             {selectedSentiments.map((sentiment) => {
-                              const expression = sentimentExpressions[sentiment][rowIndex];
+                              const expression = sentimentExprs[sentiment][rowIndex];
                               return (
                                 <TableCell
                                   key={sentiment}
-                                  onClick={() => expression && handleExpressionRowClick(expression)}
                                   sx={{
-                                    bgcolor: sentiment === clusterSentiment
-                                      ? expression && selectedExpressionRows.includes(expression)
-                                        ? 'rgba(20, 184, 166, 0.3)'
-                                        : 'rgba(20, 184, 166, 0.15)'
-                                      : expression && selectedExpressionRows.includes(expression)
-                                      ? 'rgba(20, 184, 166, 0.1)'
-                                      : 'transparent',
-                                    color: expression ? getSentimentColor(sentiment) : '#4b5563',
-                                    borderBottom: '1px solid #374151',
-                                    cursor: expression ? 'pointer' : 'default',
-                                    '&:hover': expression ? {
-                                      bgcolor: 'rgba(55, 65, 81, 0.5)',
-                                    } : {},
+                                    ...bodyCellSx(expression ? getSentimentColor(sentiment) : '#4b5563'),
+                                    bgcolor: sentiment === clusterSentiment ? 'rgba(20, 184, 166, 0.12)' : 'transparent',
                                   }}
                                 >
                                   {expression || '-'}
@@ -446,94 +611,77 @@ export default function ExpressionNodePanel({ data, selectedKeywords }: Expressi
                             })}
                           </TableRow>
                         ));
-                      })() : (
-                        <TableRow>
-                          <TableCell
-                            colSpan={selectedSentiments.length + 1}
-                            sx={{ color: '#6b7280', textAlign: 'center', py: 4, borderBottom: '1px solid #374151' }}
-                          >
-                            왼쪽에서 클러스터를 선택하세요
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Paper>
-            </Grid>
-          </>
-        )}
-      </Grid>
+                      })()
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={selectedSentiments.length + 1}
+                          sx={{ color: '#6b7280', textAlign: 'center', py: 4, borderBottom: 'none' }}
+                        >
+                          왼쪽에서 클러스터를 선택하세요
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Paper>
+          </Grid>
+        </Grid>
+      )}
 
-      {/* 원문 목록 */}
-      <Paper sx={{ p: 3, bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
-        <Typography variant="subtitle1" sx={{ color: '#f9fafb', mb: 2, fontWeight: 600 }}>
-          원문 ({filteredDocuments.length}건)
-        </Typography>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {paginatedDocuments.map((doc) => (
-            <Box
-              key={doc.id}
-              sx={{
-                p: 2,
-                bgcolor: '#374151',
-                borderRadius: 1,
-                border: '1px solid #4b5563',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Chip label={doc.domain} size="small" sx={{ bgcolor: '#14b8a6', color: 'white', fontSize: '11px' }} />
-                <Typography variant="caption" sx={{ color: '#9ca3af' }}>
-                  {new Date(doc.publishedAt).toLocaleDateString('ko-KR')}
-                </Typography>
+      {/* 클러스터 뷰용 원문 목록 */}
+      {showCluster && (
+        <Paper sx={{ p: 3, bgcolor: '#1f2937', border: '1px solid #374151', borderRadius: 2 }}>
+          <Typography variant="subtitle1" sx={{ color: '#f9fafb', mb: 2, fontWeight: 600 }}>
+            원문 ({clusterDocuments.length}건)
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {paginatedClusterDocs.map((doc) => (
+              <Box key={doc.id} sx={{ p: 2, bgcolor: '#374151', borderRadius: 1, border: '1px solid #4b5563' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Chip label={doc.domain} size="small" sx={{ bgcolor: '#14b8a6', color: 'white', fontSize: '11px' }} />
+                  <Typography variant="caption" sx={{ color: '#9ca3af' }}>
+                    {new Date(doc.publishedAt).toLocaleDateString('ko-KR')}
+                  </Typography>
+                </Box>
+                <Typography variant="subtitle2" sx={{ color: '#f9fafb', mb: 1, fontWeight: 600 }}>{doc.title}</Typography>
+                <Typography variant="body2" sx={{ color: '#d1d5db', lineHeight: 1.6 }}>{doc.content}</Typography>
+                {doc.url && (
+                  <Typography
+                    variant="caption"
+                    component="a"
+                    href={doc.url}
+                    target="_blank"
+                    sx={{ color: '#14b8a6', mt: 1, display: 'block', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}
+                  >
+                    원문 보기 →
+                  </Typography>
+                )}
               </Box>
-              <Typography variant="subtitle2" sx={{ color: '#f9fafb', mb: 1, fontWeight: 600 }}>
-                {doc.title}
+            ))}
+            {clusterDocuments.length === 0 && (
+              <Typography sx={{ color: '#6b7280', textAlign: 'center', py: 4 }}>
+                선택된 조건에 해당하는 원문이 없습니다.
               </Typography>
-              <Typography variant="body2" sx={{ color: '#d1d5db', lineHeight: 1.6 }}>
-                {doc.content}
-              </Typography>
-              {doc.url && (
-                <Typography
-                  variant="caption"
-                  component="a"
-                  href={doc.url}
-                  target="_blank"
-                  sx={{
-                    color: '#14b8a6',
-                    mt: 1,
-                    display: 'block',
-                    textDecoration: 'none',
-                    '&:hover': { textDecoration: 'underline' },
-                  }}
-                >
-                  원문 보기 →
-                </Typography>
-              )}
-            </Box>
-          ))}
-        </Box>
-
-        {/* 페이지네이션 */}
-        {totalPages > 1 && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
-            <Pagination
-              count={totalPages}
-              page={currentPage}
-              onChange={(_, page) => setCurrentPage(page)}
-              sx={{
-                '& .MuiPaginationItem-root': {
-                  color: '#f9fafb',
-                },
-                '& .Mui-selected': {
-                  bgcolor: '#14b8a6 !important',
-                  color: 'white',
-                },
-              }}
-            />
+            )}
           </Box>
-        )}
-      </Paper>
+
+          {clusterTotalPages > 1 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+              <Pagination
+                count={clusterTotalPages}
+                page={currentPage}
+                onChange={(_, page) => setCurrentPage(page)}
+                sx={{
+                  '& .MuiPaginationItem-root': { color: '#f9fafb' },
+                  '& .Mui-selected': { bgcolor: '#14b8a6 !important', color: 'white' },
+                }}
+              />
+            </Box>
+          )}
+        </Paper>
+      )}
     </Box>
   );
 }

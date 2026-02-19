@@ -8,9 +8,6 @@ import {
   Paper,
   TextField,
   Button,
-  Grid,
-  Checkbox,
-  FormControlLabel,
 } from '@mui/material';
 import { ArrowBack as BackIcon, Search as SearchIcon } from '@mui/icons-material';
 import NetworkGraph from '../components/NetworkGraph/NetworkGraph';
@@ -45,10 +42,6 @@ export default function AnalysisResults() {
     SubjectNodeDetail | RelationNodeDetail | ExpressionNodeDetail | null
   >(null);
 
-  // 전역 주제어 키워드 필터 (모든 노드에 적용)
-  const [selectedSubjectKeywords, setSelectedSubjectKeywords] = useState<string[]>([]);
-  // 임시 주제어 키워드 선택 (반영 전)
-  const [tempSelectedSubjectKeywords, setTempSelectedSubjectKeywords] = useState<string[]>([]);
 
   // 결과 데이터 로드
   useEffect(() => {
@@ -110,16 +103,6 @@ export default function AnalysisResults() {
       if (response.success) {
         setNodeDetail(response.data);
 
-        // 주제어 노드 선택 시: 전역 주제어 필터가 비어있으면 모든 키워드로 초기화
-        if (nodeType === 'subject' && selectedSubjectKeywords.length === 0) {
-          const subjectDetail = response.data as SubjectNodeDetail;
-          const allKeywords = subjectDetail.keywords.map((k) => k.id);
-          setSelectedSubjectKeywords(allKeywords);
-          setTempSelectedSubjectKeywords(allKeywords);
-        } else if (nodeType === 'subject') {
-          // 이미 전역 필터가 설정되어 있으면 임시 선택을 전역 필터로 동기화
-          setTempSelectedSubjectKeywords(selectedSubjectKeywords);
-        }
       }
     } catch (err) {
       console.error('Failed to fetch node detail:', err);
@@ -128,26 +111,11 @@ export default function AnalysisResults() {
     }
   };
 
-  // 주제어 키워드 선택 토글 핸들러 (임시 선택)
-  const handleSubjectKeywordToggle = (keywordId: string) => {
-    setTempSelectedSubjectKeywords((prev) =>
-      prev.includes(keywordId) ? prev.filter((id) => id !== keywordId) : [...prev, keywordId]
-    );
-  };
-
-  // 주제어 키워드 선택 반영 (전역 적용)
-  const handleApplySubjectKeywords = () => {
-    setSelectedSubjectKeywords(tempSelectedSubjectKeywords);
-  };
-
   // 기간 적용 핸들러
   const handleApplyPeriod = () => {
-    // 기간 변경 시 선택된 노드 및 범위 지정 초기화
     setSelectedNodeId(null);
     setSelectedNodeType(null);
     setNodeDetail(null);
-    setSelectedSubjectKeywords([]);
-    setTempSelectedSubjectKeywords([]);
   };
 
   // 텍스트 쿼리 전송 핸들러
@@ -252,73 +220,7 @@ export default function AnalysisResults() {
         <Typography variant="h6" sx={{ color: '#f9fafb', mb: 2, fontWeight: 600 }}>
           분석 구조
         </Typography>
-        <Grid container spacing={3}>
-          {/* 좌측: 네트워크 그래프 */}
-          <Grid size={{ xs: 12, md: selectedNodeId && selectedNodeType === 'subject' ? 9 : 12 }}>
-            <NetworkGraph data={resultsData.networkGraph} onNodeClick={handleNodeClick} />
-          </Grid>
-
-          {/* 우측: 주제어 키워드 선택 패널 (주제어 노드 선택 시만) */}
-          {selectedNodeId && selectedNodeType === 'subject' && nodeDetail && (
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Paper
-                sx={{
-                  p: 3,
-                  bgcolor: '#1f2937',
-                  border: '1px solid #374151',
-                  borderRadius: 2,
-                  position: 'sticky',
-                  top: '20px',
-                  maxHeight: 'calc(100vh - 40px)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                }}
-              >
-                <Typography variant="subtitle1" sx={{ color: '#f9fafb', mb: 2, fontWeight: 600 }}>
-                  범위 지정 (전체 노드 적용)
-                </Typography>
-                <Typography variant="body2" sx={{ color: '#9ca3af', mb: 2 }}>
-                  주제어를 선택하면 모든 노드에 필터가 적용됩니다
-                </Typography>
-
-                <Box sx={{ flex: 1, overflowY: 'auto', mb: 2 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    {(nodeDetail as SubjectNodeDetail).keywords.map((keyword) => (
-                      <FormControlLabel
-                        key={keyword.id}
-                        control={
-                          <Checkbox
-                            checked={tempSelectedSubjectKeywords.includes(keyword.id)}
-                            onChange={() => handleSubjectKeywordToggle(keyword.id)}
-                            sx={{
-                              color: '#14b8a6',
-                              '&.Mui-checked': {
-                                color: '#14b8a6',
-                              },
-                            }}
-                          />
-                        }
-                        label={<Typography sx={{ color: '#f9fafb', fontSize: '14px' }}>{keyword.name}</Typography>}
-                      />
-                    ))}
-                  </Box>
-                </Box>
-
-                <Button
-                  variant="contained"
-                  fullWidth
-                  onClick={handleApplySubjectKeywords}
-                  sx={{
-                    bgcolor: '#14b8a6',
-                    '&:hover': { bgcolor: '#0d9488' },
-                  }}
-                >
-                  반영
-                </Button>
-              </Paper>
-            </Grid>
-          )}
-        </Grid>
+        <NetworkGraph data={resultsData.networkGraph} onNodeClick={handleNodeClick} />
       </Box>
 
       {/* 노드 상세 패널 */}
@@ -340,13 +242,13 @@ export default function AnalysisResults() {
           ) : nodeDetail ? (
             <>
               {selectedNodeType === 'subject' && (
-                <SubjectNodePanel data={nodeDetail as SubjectNodeDetail} selectedKeywords={selectedSubjectKeywords} />
+                <SubjectNodePanel data={nodeDetail as SubjectNodeDetail} />
               )}
               {selectedNodeType === 'relation' && (
-                <RelationNodePanel data={nodeDetail as RelationNodeDetail} selectedKeywords={selectedSubjectKeywords} />
+                <RelationNodePanel data={nodeDetail as RelationNodeDetail} />
               )}
               {selectedNodeType === 'expression' && (
-                <ExpressionNodePanel data={nodeDetail as ExpressionNodeDetail} selectedKeywords={selectedSubjectKeywords} />
+                <ExpressionNodePanel data={nodeDetail as ExpressionNodeDetail} />
               )}
             </>
           ) : null}
